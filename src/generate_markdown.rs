@@ -11,7 +11,7 @@ pub fn print_markdown(m: Metadata, notes: Vec<Section>) {
     for section in notes {
         match section {
             Section::Chapter(c) => println!("## {c}\n"),
-            Section::N(highlight) => {
+            Section::HL(highlight) => {
                 println!(
                     "### Highlight (Page {}, {})\n",
                     &highlight.page, &highlight.timestamp

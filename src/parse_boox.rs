@@ -1,29 +1,37 @@
+//! # parse_boox
+//!
+//! `parse_boox` is a collection of functions to parse boox highlight export text files
+//!
+//! use chrono::NaiveDateTime;
+
 use chrono::NaiveDateTime;
 use nom::{
     branch::alt,
-    bytes::{
-        complete::{is_not, take_till, take_until, take_while},
-        streaming::tag,
-    },
-    combinator::{map, opt},
-    sequence::{delimited, preceded, terminated, Tuple},
-    IResult,
+    bytes::complete::{tag, take_till, take_until, take_while, take_while_m_n},
+    combinator::{all_consuming, map, opt, recognize},
+    multi::many0,
+    sequence::{delimited, preceded, terminated, tuple, Tuple},
+    IResult, Parser,
 };
 
 use crate::{
-    model::{Metadata, Note, Section},
+    model::{BooxFile, Highlight, Metadata, Section},
     nom_util::take_until_multiple,
 };
 
 const SEP_TEXT: &str = " | ";
 
+pub fn is_digit(c: char) -> bool {
+    c.is_digit(10)
+}
+
 pub fn parse_header(i: &str) -> IResult<&str, Metadata> {
     let start = map(take_until(SEP_TEXT), drop);
     let sep = map(tag(SEP_TEXT), drop);
     let title = delimited(tag("<<"), take_until(">>"), tag(">>"));
-    let author = is_not("\n");
+    let author = terminated(take_until("\n"), opt(tag("\n")));
 
-    let (i, (_, _, title, author, _)) = (start, sep, title, author, opt(tag("\n"))).parse(i)?;
+    let (i, (_, _, title, author)) = (start, sep, title, author).parse(i)?;
 
     Ok((
         i,
@@ -34,39 +42,281 @@ pub fn parse_header(i: &str) -> IResult<&str, Metadata> {
     ))
 }
 
-pub fn parse_note(i: &str) -> IResult<&str, Note> {
-    let is_digit = |c: char| c.is_digit(10);
-    let timestamp = take_until(SEP_TEXT);
+fn parse_timestamp(i: &str) -> IResult<&str, NaiveDateTime> {
+    let mut timestamp = recognize(tuple((
+        take_while_m_n(4, 4, is_digit),
+        tag("-"),
+        take_while_m_n(2, 2, is_digit),
+        tag("-"),
+        take_while_m_n(2, 2, is_digit),
+        tag(" "),
+        take_while_m_n(2, 2, is_digit),
+        tag(":"),
+        take_while_m_n(2, 2, is_digit),
+    )));
+
+    timestamp(i).and_then(|t| {
+        let matched = t.1;
+        let timestamp = NaiveDateTime::parse_from_str(matched, "%Y-%m-%d %H:%M")
+            .map_err(|_| nom::Err::Error(nom::error::Error::new(i, nom::error::ErrorKind::Tag)))?;
+
+        Ok((t.0, timestamp))
+    })
+}
+
+pub fn parse_highlight(i: &str) -> IResult<&str, Highlight> {
     let page = delimited(take_till(is_digit), take_while(is_digit), take_until("\n"));
 
-    let end = "-------------------\n";
-    let note_tag = "【Note】";
-    let options = &[note_tag, end];
-    let highlight = take_until_multiple(options);
-    let note = preceded(tag(note_tag), take_until(end));
+    const NOTE_END_MARKER: &str = "-------------------";
+    const NOTE_TAG: &str = "【Note】";
+    const HIGHLIGHT_END_MARKERS: &[&str; 2] = &[NOTE_TAG, NOTE_END_MARKER];
 
-    let (i, (timestamp, page, _, highlight, note, _)) =
-        (timestamp, page, tag("\n"), highlight, opt(note), tag(end)).parse(i)?;
+    let mut highlight = take_until_multiple(HIGHLIGHT_END_MARKERS);
+    let note = preceded(tag(NOTE_TAG), take_until(NOTE_END_MARKER));
 
-    let timestamp = NaiveDateTime::parse_from_str(timestamp, "%Y-%m-%d %H:%M ")
-        .map_err(|_| nom::Err::Error(nom::error::Error::new("", nom::error::ErrorKind::Tag)))?;
+    let (i, timestamp) = parse_timestamp(i)?;
+    let (i, page) = terminated(page, tag("\n")).parse(i).and_then(|(r, m)| {
+        let v = m.parse().map_err(|_| {
+            nom::Err::Error(nom::error::Error::new(
+                "Invalid Page",
+                nom::error::ErrorKind::Tag,
+            ))
+        })?;
+
+        Ok((r, v))
+    })?;
+    let (i, highlight) = highlight(i).map(|(r, m)| (r, m.trim().to_owned()))?;
+    let (i, note) = opt(note)(i).map(|(r, m)| (r, m.map(|s| s.trim().to_owned())))?;
+    let (i, _) = (tag(NOTE_END_MARKER), opt(tag("\n"))).parse(i)?;
 
     Ok((
         i,
-        Note {
+        Highlight {
             timestamp,
-            page: page.parse().unwrap(),
-            highlight: highlight.trim().to_owned(),
-            note: note.map(|s| s.trim().to_owned()),
+            page,
+            highlight,
+            note,
         },
     ))
 }
 
-pub fn parse_note_or_chapter(i: &str) -> IResult<&str, Section> {
+pub fn parse_highlight_or_chapter(i: &str) -> IResult<&str, Section> {
     let chapter_line = terminated(take_until("\n"), tag("\n"));
 
     alt((
-        map(parse_note, Section::N),
-        map(chapter_line, Section::Chapter),
+        map(parse_highlight, Section::HL),
+        map(map(chapter_line, &str::to_owned), Section::Chapter),
     ))(i)
+}
+
+pub fn parse_boox(i: &str) -> IResult<&str, BooxFile> {
+    let (i, (metadata, sections)) = (
+        parse_header,
+        all_consuming(many0(parse_highlight_or_chapter)),
+    )
+        .parse(&i)?;
+
+    Ok((i, BooxFile { metadata, sections }))
+}
+
+#[test]
+fn boox_test() {
+    use chrono::NaiveDate;
+
+    let data = include_str!("../data/data.txt");
+
+    let res = parse_boox(data);
+
+    assert_eq!(
+        res,
+        Ok((
+            "",
+            BooxFile {
+                metadata: Metadata {
+                    title: "Building a Second Brain -- A Proven Method".to_owned(),
+                    author: "Tiago Forte".to_owned()
+                },
+                sections: vec![
+                    Section::HL(Highlight {
+                        timestamp: NaiveDate::from_ymd_opt(2023, 4, 3)
+                            .unwrap()
+                            .and_hms_opt(0, 41, 0)
+                            .unwrap(),
+                        page: 6,
+                        highlight: "PKM—or personal knowledge management".to_owned(),
+                        note: None
+                    }),
+                    Section::Chapter("Chapter 3: How a Second Brain Works".to_string()),
+                    Section::HL(Highlight {
+                        timestamp: NaiveDate::from_ymd_opt(2023, 4, 3)
+                            .unwrap()
+                            .and_hms_opt(1, 21, 0)
+                            .unwrap(),
+                        page: 32,
+                        highlight: "We bookmark articles to read later, but rarely find the time to revisit them again".to_owned(),
+                        note: Some("There's too many to \nactually read them all".to_owned())
+                    }),
+                    Section::HL(Highlight {
+                        timestamp: NaiveDate::from_ymd_opt(2023, 4, 3)
+                            .unwrap()
+                            .and_hms_opt(16, 57, 0)
+                            .unwrap(),
+                        page: 39,
+                        highlight: "In other words, \nthe jobs that are most likely to stick around are those that involve promoting or defending a particular perspective".to_owned(),
+                        note: Some("Not sure about now with LLMs".to_owned())
+                    }),
+                    Section::HL(Highlight {
+                        timestamp: NaiveDate::from_ymd_opt(2023, 4, 3)
+                            .unwrap()
+                            .and_hms_opt(17, 01, 0)
+                            .unwrap(),
+                        page: 40,
+                        highlight: "Multimedia".to_owned(),
+                        note: None
+                    }),
+                ]
+            }
+        ))
+    )
+}
+
+#[test]
+fn section_test() {
+    use chrono::NaiveDate;
+
+    assert_eq!(
+        parse_highlight_or_chapter(
+            "2023-04-03 01:21  |  Page No.: 32\nWe bookmark articles to read later\n【Note】There's too many\n-------------------\n"
+        ),
+        Ok((
+            "",
+            Section::HL(Highlight {
+                timestamp: NaiveDate::from_ymd_opt(2023, 4, 3)
+                    .unwrap()
+                    .and_hms_opt(1, 21, 0)
+                    .unwrap(),
+                page: 32,
+                highlight: "We bookmark articles to read later".to_owned(),
+                note: Some("There's too many".to_owned())
+            })
+        ))
+    );
+
+    assert_eq!(
+        parse_highlight_or_chapter("Chapter 3: How a Second Brain Works\n"),
+        Ok((
+            "",
+            Section::Chapter("Chapter 3: How a Second Brain Works".to_string())
+        ))
+    );
+}
+
+#[test]
+fn highlight_test() {
+    use chrono::NaiveDate;
+    use nom::{
+        error::{Error, ErrorKind::TakeWhileMN},
+        Err,
+    };
+
+    assert_eq!(
+        parse_highlight(
+            "2023-04-03 01:21  |  Page No.: 32\nWe bookmark articles to read later\n【Note】There's too many\n-------------------\n"
+        ),
+        Ok((
+            "",
+            Highlight {
+                timestamp: NaiveDate::from_ymd_opt(2023, 4, 3)
+                    .unwrap()
+                    .and_hms_opt(1, 21, 0)
+                    .unwrap(),
+                page: 32,
+                highlight: "We bookmark articles to read later".to_owned(),
+                note: Some("There's too many".to_owned())
+            }
+        ))
+    );
+
+    assert_eq!(
+        parse_highlight(
+            "2023-04-03 01:21  |  Page No.: 32\nWe bookmark articles to read later\n【Note】There's too many\n-------------------"
+        ),
+        Ok((
+            "",
+            Highlight {
+                timestamp: NaiveDate::from_ymd_opt(2023, 4, 3)
+                    .unwrap()
+                    .and_hms_opt(1, 21, 0)
+                    .unwrap(),
+                page: 32,
+                highlight: "We bookmark articles to read later".to_owned(),
+                note: Some("There's too many".to_owned())
+            }
+        ))
+    );
+
+    assert_eq!(
+        parse_highlight("Reading Notes"),
+        Err(Err::Error(Error::new("Reading Notes", TakeWhileMN)))
+    );
+
+    assert_eq!(
+        parse_highlight("Chapter 3: How a Second Brain Works"),
+        Err(Err::Error(Error::new(
+            "Chapter 3: How a Second Brain Works",
+            TakeWhileMN
+        )))
+    );
+}
+
+#[test]
+fn header_test() {
+    use nom::{
+        error::{Error, ErrorKind::TakeUntil},
+        Err,
+    };
+
+    assert_eq!(
+        parse_header("Reading Notes | <<Building a Second Brain -- A Proven Method>>Tiago Forte\n"),
+        Ok((
+            "",
+            Metadata {
+                title: "Building a Second Brain -- A Proven Method".to_owned(),
+                author: "Tiago Forte".to_owned()
+            }
+        ))
+    );
+
+    assert_eq!(
+        parse_header("Reading Notes"),
+        Err(Err::Error(Error::new("Reading Notes", TakeUntil)))
+    );
+}
+
+#[test]
+fn timestamp_test() {
+    use chrono::NaiveDate;
+    use nom::{
+        error::{Error, ErrorKind::TakeWhileMN},
+        Err,
+    };
+
+    assert_eq!(
+        parse_timestamp("2023-04-03 00:41"),
+        Ok((
+            "",
+            NaiveDate::from_ymd_opt(2023, 4, 3)
+                .unwrap()
+                .and_hms_opt(0, 41, 0)
+                .unwrap()
+        ))
+    );
+
+    assert_eq!(
+        parse_timestamp("oh no 2023-04-03 00:41"),
+        Err(Err::Error(Error::new(
+            "oh no 2023-04-03 00:41",
+            TakeWhileMN
+        )))
+    );
 }
