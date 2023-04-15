@@ -127,7 +127,7 @@ pub fn parse_boox(i: &str) -> IResult<&str, BooxFile, VerboseError<&str>> {
 fn boox_test() {
     use chrono::NaiveDate;
 
-    let data = include_str!("../data/data.txt");
+    let data = include_str!("../test/data/data.txt");
 
     let res = parse_boox(data);
 
@@ -188,7 +188,7 @@ fn boox_test() {
 fn all_data_test() {
     use std::fs;
 
-    let files = fs::read_dir("./data/").unwrap();
+    let files = fs::read_dir("./test/data/").unwrap();
 
     for file in files {
         let boox = file

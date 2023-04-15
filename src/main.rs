@@ -25,7 +25,7 @@ fn main() {
 
 #[test]
 fn boox_test() {
-    let data = include_str!("../data/russian_1.txt");
+    let data = include_str!("../test/data/russian_1.txt");
 
     let boox = parse_boox(data);
     let md = boox.map(|b| DisplayMarkdown(&b.1).to_string());
