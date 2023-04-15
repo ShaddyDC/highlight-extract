@@ -1,10 +1,9 @@
 use std::fs;
 
-use crate::parse_boox::{parse_header, parse_highlight_or_chapter};
-use generate_markdown::print_markdown;
-use nom::{combinator::all_consuming, multi::many0, sequence::Tuple};
+use crate::display_markdown::DisplayMarkdown;
+use parse_boox::parse_boox;
 
-mod generate_markdown;
+mod display_markdown;
 mod model;
 mod nom_util;
 mod parse_boox;
@@ -12,12 +11,7 @@ mod parse_boox;
 fn main() {
     let data = fs::read_to_string("data/data.txt").unwrap();
 
-    let (_, (m, notes)) = (
-        parse_header,
-        all_consuming(many0(parse_highlight_or_chapter)),
-    )
-        .parse(&data)
-        .unwrap();
+    let boox = parse_boox(&data).unwrap().1;
 
-    print_markdown(m, notes);
+    println!("{}", DisplayMarkdown(&boox));
 }
