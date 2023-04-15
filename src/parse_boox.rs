@@ -24,7 +24,7 @@ pub const fn is_digit(c: char) -> bool {
     c.is_ascii_digit()
 }
 
-pub fn parse_header(i: &str) -> IResult<&str, Metadata, VerboseError<&str>> {
+fn parse_header(i: &str) -> IResult<&str, Metadata, VerboseError<&str>> {
     let start = map(take_until(SEP_TEXT), drop);
     let sep = map(tag(SEP_TEXT), drop);
     let title = delimited(tag("<<"), take_until(">>"), tag(">>"));
@@ -68,7 +68,7 @@ fn parse_timestamp(i: &str) -> IResult<&str, NaiveDateTime, VerboseError<&str>> 
     })
 }
 
-pub fn parse_highlight(i: &str) -> IResult<&str, Highlight, VerboseError<&str>> {
+fn parse_highlight(i: &str) -> IResult<&str, Highlight, VerboseError<&str>> {
     const NOTE_END_MARKER: &str = "-------------------";
     const NOTE_TAG: &str = "【Note】";
     const HIGHLIGHT_END_MARKERS: &[&str; 2] = &[NOTE_TAG, NOTE_END_MARKER];
@@ -104,7 +104,7 @@ pub fn parse_highlight(i: &str) -> IResult<&str, Highlight, VerboseError<&str>> 
     ))
 }
 
-pub fn parse_highlight_or_chapter(i: &str) -> IResult<&str, Section, VerboseError<&str>> {
+fn parse_highlight_or_chapter(i: &str) -> IResult<&str, Section, VerboseError<&str>> {
     let chapter_line = terminated(take_until("\n"), tag("\n"));
 
     alt((
