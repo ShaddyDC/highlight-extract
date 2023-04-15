@@ -17,7 +17,7 @@ pub trait AsMarkdown {
 impl AsMarkdown for BooxFile {
     fn fmt_markdown(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         writeln!(f, "# {}", &self.metadata.title)?;
-        writeln!(f, "")?;
+        writeln!(f)?;
         writeln!(f, "**Author:** {}", &self.metadata.author)?;
         writeln!(f, "\n---\n")?;
 
@@ -35,7 +35,7 @@ impl AsMarkdown for BooxFile {
                     for line in highlight.highlight.lines() {
                         writeln!(f, "> {line}")?;
                     }
-                    writeln!(f, "")?;
+                    writeln!(f)?;
 
                     if let Some(n) = &highlight.note {
                         writeln!(f, "{n}\n")?;

@@ -26,7 +26,7 @@ pub trait HasLen {
 
 impl HasLen for &str {
     fn len(&self) -> usize {
-        str::len(&self)
+        str::len(self)
     }
 }
 

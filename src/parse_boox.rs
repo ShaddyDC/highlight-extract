@@ -1,8 +1,6 @@
-//! # parse_boox
+//! # `parse_boox`
 //!
 //! `parse_boox` is a collection of functions to parse boox highlight export text files
-//!
-//! use chrono::NaiveDateTime;
 
 use chrono::NaiveDateTime;
 use nom::{
@@ -22,8 +20,8 @@ use crate::{
 
 const SEP_TEXT: &str = " | ";
 
-pub fn is_digit(c: char) -> bool {
-    c.is_digit(10)
+pub const fn is_digit(c: char) -> bool {
+    c.is_ascii_digit()
 }
 
 pub fn parse_header(i: &str) -> IResult<&str, Metadata, VerboseError<&str>> {
@@ -71,12 +69,11 @@ fn parse_timestamp(i: &str) -> IResult<&str, NaiveDateTime, VerboseError<&str>> 
 }
 
 pub fn parse_highlight(i: &str) -> IResult<&str, Highlight, VerboseError<&str>> {
-    let page = delimited(take_till(is_digit), take_while(is_digit), take_until("\n"));
-
     const NOTE_END_MARKER: &str = "-------------------";
     const NOTE_TAG: &str = "【Note】";
     const HIGHLIGHT_END_MARKERS: &[&str; 2] = &[NOTE_TAG, NOTE_END_MARKER];
 
+    let page = delimited(take_till(is_digit), take_while(is_digit), take_until("\n"));
     let mut highlight = take_until_multiple(HIGHLIGHT_END_MARKERS);
     let note = preceded(tag(NOTE_TAG), take_until(NOTE_END_MARKER));
 
@@ -121,7 +118,7 @@ pub fn parse_boox(i: &str) -> IResult<&str, BooxFile, VerboseError<&str>> {
         parse_header,
         all_consuming(many0(parse_highlight_or_chapter)),
     )
-        .parse(&i)?;
+        .parse(i)?;
 
     Ok((i, BooxFile { metadata, sections }))
 }
