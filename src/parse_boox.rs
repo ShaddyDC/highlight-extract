@@ -188,6 +188,22 @@ fn boox_test() {
 }
 
 #[test]
+fn all_data_test() {
+    use std::fs;
+
+    let files = fs::read_dir("./data/").unwrap();
+
+    for file in files {
+        let boox = file
+            .map(|e| e.path())
+            .and_then(fs::read_to_string)
+            .map(|s| parse_boox(&s).map(|(_, b)| b).unwrap());
+
+        assert!(boox.is_ok());
+    }
+}
+
+#[test]
 fn section_test() {
     use chrono::NaiveDate;
 
