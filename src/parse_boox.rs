@@ -9,6 +9,7 @@ use nom::{
     branch::alt,
     bytes::complete::{tag, take_till, take_until, take_while, take_while_m_n},
     combinator::{all_consuming, map, opt, recognize},
+    error::{FromExternalError, VerboseError},
     multi::many0,
     sequence::{delimited, preceded, terminated, tuple, Tuple},
     IResult, Parser,
@@ -25,7 +26,7 @@ pub fn is_digit(c: char) -> bool {
     c.is_digit(10)
 }
 
-pub fn parse_header(i: &str) -> IResult<&str, Metadata> {
+pub fn parse_header(i: &str) -> IResult<&str, Metadata, VerboseError<&str>> {
     let start = map(take_until(SEP_TEXT), drop);
     let sep = map(tag(SEP_TEXT), drop);
     let title = delimited(tag("<<"), take_until(">>"), tag(">>"));
@@ -42,7 +43,7 @@ pub fn parse_header(i: &str) -> IResult<&str, Metadata> {
     ))
 }
 
-fn parse_timestamp(i: &str) -> IResult<&str, NaiveDateTime> {
+fn parse_timestamp(i: &str) -> IResult<&str, NaiveDateTime, VerboseError<&str>> {
     let mut timestamp = recognize(tuple((
         take_while_m_n(4, 4, is_digit),
         tag("-"),
@@ -57,14 +58,19 @@ fn parse_timestamp(i: &str) -> IResult<&str, NaiveDateTime> {
 
     timestamp(i).and_then(|t| {
         let matched = t.1;
-        let timestamp = NaiveDateTime::parse_from_str(matched, "%Y-%m-%d %H:%M")
-            .map_err(|_| nom::Err::Error(nom::error::Error::new(i, nom::error::ErrorKind::Tag)))?;
+        let timestamp = NaiveDateTime::parse_from_str(matched, "%Y-%m-%d %H:%M").map_err(|e| {
+            nom::Err::Error(nom::error::VerboseError::from_external_error(
+                i,
+                nom::error::ErrorKind::MapRes,
+                e,
+            ))
+        })?;
 
         Ok((t.0, timestamp))
     })
 }
 
-pub fn parse_highlight(i: &str) -> IResult<&str, Highlight> {
+pub fn parse_highlight(i: &str) -> IResult<&str, Highlight, VerboseError<&str>> {
     let page = delimited(take_till(is_digit), take_while(is_digit), take_until("\n"));
 
     const NOTE_END_MARKER: &str = "-------------------";
@@ -76,10 +82,11 @@ pub fn parse_highlight(i: &str) -> IResult<&str, Highlight> {
 
     let (i, timestamp) = parse_timestamp(i)?;
     let (i, page) = terminated(page, tag("\n")).parse(i).and_then(|(r, m)| {
-        let v = m.parse().map_err(|_| {
-            nom::Err::Error(nom::error::Error::new(
-                "Invalid Page",
-                nom::error::ErrorKind::Tag,
+        let v = m.parse().map_err(|e| {
+            nom::Err::Error(nom::error::VerboseError::from_external_error(
+                m,
+                nom::error::ErrorKind::MapRes,
+                e,
             ))
         })?;
 
@@ -100,7 +107,7 @@ pub fn parse_highlight(i: &str) -> IResult<&str, Highlight> {
     ))
 }
 
-pub fn parse_highlight_or_chapter(i: &str) -> IResult<&str, Section> {
+pub fn parse_highlight_or_chapter(i: &str) -> IResult<&str, Section, VerboseError<&str>> {
     let chapter_line = terminated(take_until("\n"), tag("\n"));
 
     alt((
@@ -109,7 +116,7 @@ pub fn parse_highlight_or_chapter(i: &str) -> IResult<&str, Section> {
     ))(i)
 }
 
-pub fn parse_boox(i: &str) -> IResult<&str, BooxFile> {
+pub fn parse_boox(i: &str) -> IResult<&str, BooxFile, VerboseError<&str>> {
     let (i, (metadata, sections)) = (
         parse_header,
         all_consuming(many0(parse_highlight_or_chapter)),
@@ -215,7 +222,7 @@ fn section_test() {
 fn highlight_test() {
     use chrono::NaiveDate;
     use nom::{
-        error::{Error, ErrorKind::TakeWhileMN},
+        error::{ErrorKind::TakeWhileMN, ParseError, VerboseError},
         Err,
     };
 
@@ -257,12 +264,15 @@ fn highlight_test() {
 
     assert_eq!(
         parse_highlight("Reading Notes"),
-        Err(Err::Error(Error::new("Reading Notes", TakeWhileMN)))
+        Err(Err::Error(VerboseError::from_error_kind(
+            "Reading Notes",
+            TakeWhileMN
+        )))
     );
 
     assert_eq!(
         parse_highlight("Chapter 3: How a Second Brain Works"),
-        Err(Err::Error(Error::new(
+        Err(Err::Error(VerboseError::from_error_kind(
             "Chapter 3: How a Second Brain Works",
             TakeWhileMN
         )))
@@ -272,7 +282,7 @@ fn highlight_test() {
 #[test]
 fn header_test() {
     use nom::{
-        error::{Error, ErrorKind::TakeUntil},
+        error::{ErrorKind::TakeUntil, ParseError, VerboseError},
         Err,
     };
 
@@ -289,7 +299,10 @@ fn header_test() {
 
     assert_eq!(
         parse_header("Reading Notes"),
-        Err(Err::Error(Error::new("Reading Notes", TakeUntil)))
+        Err(Err::Error(VerboseError::from_error_kind(
+            "Reading Notes",
+            TakeUntil
+        )))
     );
 }
 
@@ -297,7 +310,7 @@ fn header_test() {
 fn timestamp_test() {
     use chrono::NaiveDate;
     use nom::{
-        error::{Error, ErrorKind::TakeWhileMN},
+        error::{ErrorKind::TakeWhileMN, ParseError, VerboseError},
         Err,
     };
 
@@ -314,7 +327,7 @@ fn timestamp_test() {
 
     assert_eq!(
         parse_timestamp("oh no 2023-04-03 00:41"),
-        Err(Err::Error(Error::new(
+        Err(Err::Error(VerboseError::from_error_kind(
             "oh no 2023-04-03 00:41",
             TakeWhileMN
         )))
