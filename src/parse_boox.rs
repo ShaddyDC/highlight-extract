@@ -17,6 +17,7 @@ use crate::{
     parse_boox_v2::parse_boox_v2,
 };
 
+#[must_use]
 pub const fn is_digit(c: char) -> bool {
     c.is_ascii_digit()
 }
