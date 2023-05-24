@@ -10,3 +10,10 @@ If you have a file that is failing or unsupported, open an issue with a comprehe
 ```bash
 $ highlight-extract ./data.txt # or simply cargo run -- ./data.txt
 ```
+
+On Nix with [Flakes](https://nixos.wiki/wiki/Flakes) enabled, you can run it without installation with
+
+
+```bash
+$ nix run github:shaddydc/highlight-extract ./data.txt
+```
