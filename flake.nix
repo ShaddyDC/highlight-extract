@@ -1,39 +1,51 @@
 {
-  description = "Yomi-Dict is a yomidict dictionary reader";
+  description = "A tool to extract highlights and notes taken on an Onyx Boox e-reader for export as Markdown";
 
   inputs = {
-    nixpkgs.url = "nixpkgs/nixos-unstable";
-
-    flake-utils.url = "github:numtide/flake-utils";
-    rust-overlay = { url = "github:oxalica/rust-overlay"; };
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
+    rust-overlay = {
+      url = "github:oxalica/rust-overlay";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+    nci = {
+      url = "github:yusdacra/nix-cargo-integration";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.rust-overlay.follows = "rust-overlay";
+    };
+    parts.url = "github:hercules-ci/flake-parts";
   };
 
-  outputs = { self, nixpkgs, flake-utils, rust-overlay }:
-    flake-utils.lib.eachDefaultSystem
-      (system:
-        let
-          overlays = [ (import rust-overlay) ];
-          pkgs = import nixpkgs {
-            inherit system overlays;
-          };
-          buildInputs = with pkgs; [
-            pkgconfig
-            openssl
-            trunk
+  outputs = inputs:
+    inputs.parts.lib.mkFlake {inherit inputs;} {
+      imports = [inputs.nci.flakeModule inputs.parts.flakeModules.easyOverlay];
+      systems = [
+        "x86_64-linux"
 
-            (rust-bin.stable.latest.default.override {
-              extensions = [ "rust-src" ];
-              targets = [ "wasm32-unknown-unknown" ];
-            })
-          ];
-        in
-        with pkgs;
-        {
-          devShells.default = stdenv.mkDerivation {
-            name = "rust-env";
-            nativeBuildInputs = buildInputs;
-            RUST_BACKTRACE = 1;
-          };
-        }
-      );
+        # untested
+        "x86_64-darwin"
+        "aarch64-linux"
+        "aarch64-darwin"
+        "i686-linux"
+      ];
+
+      perSystem = {
+        config,
+        pkgs,
+        lib,
+        ...
+      }: {
+        nci.projects."HE-project".relPath = "";
+        nci.crates."highlight-extract" = {};
+
+        packages.highlight-extract = config.nci.outputs."highlight-extract".packages.release;
+        packages.highlight-extract-dev = config.nci.outputs."highlight-extract".packages.dev;
+        packages.default = config.packages.highlight-extract;
+
+        devShells.default = config.nci.outputs."highlight-extract".devShell.overrideAttrs (old: {
+          shellHook = ''
+            export RUST_BACKTRACE="1"
+          '';
+        });
+      };
+    };
 }
