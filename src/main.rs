@@ -1,6 +1,7 @@
-use std::{env, fs, path::PathBuf};
+use std::{fs, path::PathBuf};
 
 use crate::display_markdown::DisplayMarkdown;
+use clap::Parser;
 use parse_boox::parse_boox;
 
 mod display_markdown;
@@ -10,19 +11,31 @@ mod parse_boox;
 mod parse_boox_v1;
 mod parse_boox_v2;
 
+#[derive(Parser)]
+#[command(author, version, about, long_about = None)]
+struct Cli {
+    /// The highlight file to parse
+    #[arg()]
+    input_file: PathBuf,
+
+    /// Turn debugging information on
+    #[arg(short, long, default_value_t = false)]
+    json: bool,
+}
+
 // Take a path to a Boox file and print it as Markdown
 fn main() {
-    let args: Vec<String> = env::args().collect();
-    if args.len() != 2 {
-        println!("Usage: highlight-extract <path>");
-        return;
-    }
-    let file = PathBuf::from(&args[1]);
-    let data = fs::read_to_string(file).unwrap();
+    let cli = Cli::parse();
+    let data = fs::read_to_string(cli.input_file).unwrap();
 
     let boox = parse_boox(&data).unwrap().1;
 
-    println!("{}", DisplayMarkdown(&boox));
+    if cli.json {
+        let s = serde_json::to_string(&boox).unwrap();
+        print!("{s}");
+    } else {
+        println!("{}", DisplayMarkdown(&boox));
+    }
 }
 
 #[test]
