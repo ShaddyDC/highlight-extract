@@ -15,9 +15,13 @@
     parts.url = "github:hercules-ci/flake-parts";
   };
 
-  outputs = inputs:
-    inputs.parts.lib.mkFlake {inherit inputs;} {
-      imports = [inputs.nci.flakeModule inputs.parts.flakeModules.easyOverlay];
+  outputs = inputs @ {
+    parts,
+    nci,
+    ...
+  }:
+    parts.lib.mkFlake {inherit inputs;} {
+      imports = [nci.flakeModule];
       systems = [
         "x86_64-linux"
 
@@ -34,7 +38,7 @@
         lib,
         ...
       }: {
-        nci.projects."HE-project".relPath = "";
+        nci.projects."highlight-extract".path = ./.;
         nci.crates."highlight-extract" = {};
 
         packages.highlight-extract = config.nci.outputs."highlight-extract".packages.release;
@@ -45,6 +49,10 @@
           shellHook = ''
             export RUST_BACKTRACE="1"
           '';
+
+          packages = (old.packages or []) ++ (with pkgs; [
+            rust-analyzer
+          ]);
         });
       };
     };
