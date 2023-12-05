@@ -137,7 +137,7 @@ fn boox_test() {
                     Section::HL(Highlight {
                         timestamp: NaiveDate::from_ymd_opt(2023, 4, 3)
                             .unwrap()
-                            .and_hms_opt(17, 01, 0)
+                            .and_hms_opt(17, 1, 0)
                             .unwrap(),
                         page: 40,
                         highlight: "Multimedia".to_owned(),

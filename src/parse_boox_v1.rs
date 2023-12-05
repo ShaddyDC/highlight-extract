@@ -126,36 +126,36 @@ fn boox_test() {
                 },
                 sections: vec![
                     Section::HL(Highlight {
-                        timestamp: NaiveDate::from_ymd_opt(2022, 03, 07)
+                        timestamp: NaiveDate::from_ymd_opt(2022, 3, 7)
                             .unwrap()
-                            .and_hms_opt(01, 11, 0)
+                            .and_hms_opt(1, 11, 0)
                             .unwrap(),
                         page: 13,
                         highlight: "tics to a degree neither side could have imagined in the doldrums of the early 1970s, when I first took the helm at Magellan. At that low point, demoralized investors had to remind themselves that bear markets don’t last forever, and those with patience held on to their stocks and mutual funds for the fifteen years it took the Dow and other averages to regain the prices reached in the mid-1960s. Today it’s worth reminding ourselves that bull markets don’t last forever and that patience is required in both directions.On  of this book I say the breakup of ATT".to_owned(),
                         note: Some("some very good annotation".to_owned())
                     }),
                     Section::HL(Highlight {
-                        timestamp: NaiveDate::from_ymd_opt(2022, 03, 07)
+                        timestamp: NaiveDate::from_ymd_opt(2022, 3, 7)
                             .unwrap()
-                            .and_hms_opt(14, 02, 0)
+                            .and_hms_opt(14, 2, 0)
                             .unwrap(),
                         page: 20,
                         highlight: "valued at $10 billion may not be worth a dime. As expectations turn to reality, the winners will be more obvious than they are today. Investors who see this will have time to act on their “edge.”".to_owned(),
                         note: None
                     }),
                     Section::HL(Highlight {
-                        timestamp: NaiveDate::from_ymd_opt(2022, 03, 07)
+                        timestamp: NaiveDate::from_ymd_opt(2022, 3, 7)
                             .unwrap()
-                            .and_hms_opt(14, 02, 0)
+                            .and_hms_opt(14, 2, 0)
                             .unwrap(),
                         page: 20,
                         highlight: "Microsoft went public in 1986 at 15 cents a share. Three years later you could buy a share for under $1, and from there it advanced eightyfold. (The stock has “split” several times along the way, so original shares never actually sold for 15 cents—for further explanation, see the footnote on .) If you took the Missouri “show me” approach and waited to buy Microsoft until it triumphed with Windows 95, you still made seven times your money. You didn’t have to be a programmer to notice Microsoft everywhere you looked. Except in the Apple orchard, all new computers".to_owned(),
                         note: None
                     }),
                     Section::HL(Highlight {
-                        timestamp: NaiveDate::from_ymd_opt(2022, 03, 07)
+                        timestamp: NaiveDate::from_ymd_opt(2022, 3, 7)
                             .unwrap()
-                            .and_hms_opt(01, 20, 0)
+                            .and_hms_opt(1, 20, 0)
                             .unwrap(),
                         page: 22,
                         highlight: "Street Journal and Barron’s, and get a snapshot review of almost any publicly traded company. From there you can access “Zack’s” and get a summary of ratings from all the analysts who follow a particular stock.Again thanks to the Internet, the cost of buying and selling stocks has been drastically reduced for the small investor, the way it was reduced for institutional investors in 1975. On-line trading has pressured traditional brokerage houses to reduce commissions and transaction fees, continuing a trend that began with the birth of the discount broker two decades ago.You may be wondering what’s happened to my investing habits since I left Magellan. Instead of following thousands".to_owned(),
@@ -182,9 +182,9 @@ fn highlight_test() {
         Ok((
             "",
             Highlight {
-                timestamp: NaiveDate::from_ymd_opt(2022, 03, 07)
+                timestamp: NaiveDate::from_ymd_opt(2022, 3, 7)
                     .unwrap()
-                    .and_hms_opt(01, 11, 0)
+                    .and_hms_opt(1, 11, 0)
                     .unwrap(),
                 page: 13,
                 highlight: "tics to a degree".to_owned(),
